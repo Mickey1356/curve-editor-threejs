@@ -45,6 +45,77 @@ function cvtShapeToObj(shape, sceneX, sceneY, sceneWidth, sceneHeight) {
   return pts;
 }
 
+function pointCommandsToSVGPoints(pointCommands) {
+  return pointCommands.map(function (value, index, array) {
+    return ((index % 2 == 1) ? ',' : ' ') + value;
+  }).join('');
+}
+
+function pointCommandsToCSSPoints(pointCommands) {
+  return pointCommands.map(function (value, index, array) {
+    return (value / (index % 2 == 0 ? 1 : 1)).toFixed(3) + ((index % 2 == 1 && index < array.length - 1) ? ',' : '');
+  }).join(' ');
+}
+
+function pathToPoints(segments) {
+  var count = segments.numberOfItems;
+  var result = [], segment, x, y;
+  for (var i = 0; i < count; i++) {
+    segment = segments.getItem(i);
+    switch (segment.pathSegType) {
+      case SVGPathSeg.PATHSEG_MOVETO_ABS:
+      case SVGPathSeg.PATHSEG_LINETO_ABS:
+      case SVGPathSeg.PATHSEG_CURVETO_CUBIC_ABS:
+      case SVGPathSeg.PATHSEG_CURVETO_QUADRATIC_ABS:
+      case SVGPathSeg.PATHSEG_ARC_ABS:
+      case SVGPathSeg.PATHSEG_CURVETO_CUBIC_SMOOTH_ABS:
+      case SVGPathSeg.PATHSEG_CURVETO_QUADRATIC_SMOOTH_ABS:
+        x = segment.x;
+        y = segment.y;
+        break;
+
+      case SVGPathSeg.PATHSEG_MOVETO_REL:
+      case SVGPathSeg.PATHSEG_LINETO_REL:
+      case SVGPathSeg.PATHSEG_CURVETO_CUBIC_REL:
+      case SVGPathSeg.PATHSEG_CURVETO_QUADRATIC_REL:
+      case SVGPathSeg.PATHSEG_ARC_REL:
+      case SVGPathSeg.PATHSEG_CURVETO_CUBIC_SMOOTH_REL:
+      case SVGPathSeg.PATHSEG_CURVETO_QUADRATIC_SMOOTH_REL:
+        x = segment.x;
+        y = segment.y;
+        if (result.length > 0) {
+          x += result[result.length - 2];
+          y += result[result.length - 1];
+        }
+        break;
+
+      case SVGPathSeg.PATHSEG_LINETO_HORIZONTAL_ABS:
+        x = segment.x;
+        y = result[result.length - 1];
+        break;
+      case SVGPathSeg.PATHSEG_LINETO_HORIZONTAL_REL:
+        x = result[result.length - 2] + segment.x;
+        y = result[result.length - 1];
+        break;
+
+      case SVGPathSeg.PATHSEG_LINETO_VERTICAL_ABS:
+        x = result[result.length - 2];
+        y = segment.y;
+        break;
+      case SVGPathSeg.PATHSEG_LINETO_VERTICAL_REL:
+        x = result[result.length - 2];
+        y = segment.y + result[result.length - 1];
+        break;
+      case SVGPathSeg.PATHSEG_CLOSEPATH:
+        return result;
+      default:
+        console.log('unknown path command: ', segment.pathSegTypeAsLetter);
+    }
+    result.push(x, y);
+  }
+  return result;
+}
+
 // polygons obtained from https://betravis.github.io/shape-tools/path-to-polygon/
 let sharkPolygon = '132.23 48.05, 139.42 61.60, 140.42 63.60, 142.01 66.41, 149.34 34.68, 147.85 32.35, 148.85 25.87, 150.11 22.23, 157.11 1.40, 156.52 0.63, 148.67 6.00, 132.30 20.86, 126.80 32.40, 82.69 21.64, 86.00 11.16, 91.83 4.16, 94.17 3.00, 91.60 2.45, 71.48 6.46, 69.48 8.28, 60.19 18.28, 56.28 19.08, 29.08 17.87, 0.92 16.33, 2.59 41.07, 6.47 48.17, 14.22 54.43, 21.38 58.25, 27.00 61.39, 50.00 53.53, 50.54 54.38, 48.88 57.12, 31.88 74.62, 32.88 75.33, 51.38 93.26, 53.00 95.74, 61.20 102.74, 63.44 85.48, 66.63 84.00, 90.02 78.37, 94.93 82.37, 111.49 81.80, 118.96 79.43, 118.12 76.04, 110.40 71.61, 109.63 66.61, 123.28 50.01, 128.90 42.35, 132.33 48.21';
 let sharkShape = cvtPolygon(sharkPolygon);
@@ -55,4 +126,4 @@ let dinoShape = cvtPolygon(dinoPolygon);
 let pigPolygon = '133.20 67.17, 134.20 69.91, 136.58 75.23, 140.08 76.95, 142.31 73.78, 139.45 66.09, 135.79 62.15, 133.53 48.41, 131.25 38.94, 129.40 35.34, 113.02 20.74, 70.15 15.60, 64.39 3.49, 63.40 0.58, 59.48 6.18, 55.07 13.59, 49.77 3.11, 41.62 12.85, 35.00 15.79, 22.85 24.86, 17.00 34.47, 14.70 39.47, 9.37 43.14, 2.69 43.95, 2.27 44.37, 0.69 47.76, 0.54 65.47, 14.00 65.47, 11.30 69.27, 10.65 70.69, 7.52 73.00, 19.59 77.45, 37.81 94.20, 40.31 95.97, 46.57 101.29, 50.23 104.29, 55.74 101.64, 65.21 98.56, 88.14 98.24, 94.30 99.82, 99.49 104.37, 104.25 100.37, 106.25 96.02, 109.49 93.00, 128.23 80.89, 130.52 77.09, 133.20 67.17';
 let pigShape = cvtPolygon(pigPolygon);
 
-export { cvtShapeToObj, sharkShape, dinoShape, pigShape };
+export { cvtShapeToObj, pointCommandsToSVGPoints, pointCommandsToCSSPoints, pathToPoints, cvtPolygon, sharkShape, dinoShape, pigShape };

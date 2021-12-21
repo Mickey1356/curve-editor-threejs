@@ -5,7 +5,7 @@ import { OrbitControls } from '../three/examples/jsm/controls/OrbitControls.js'
 import { DecalGeometry } from '../three/examples/jsm/geometries/DecalGeometry.js'
 
 import './simplify.js'
-import { cvtShapeToObj, sharkShape, dinoShape, pigShape } from './svg.js'
+import { cvtShapeToObj, pointCommandsToCSSPoints, cvtPolygon, pathToPoints, sharkShape, dinoShape, pigShape } from './svg.js'
 
 let renderer, scene, camera, raycaster;
 let controls;
@@ -132,6 +132,45 @@ function setupDomGuiEvents() {
         break;
     }
   });
+
+  document.getElementById('loadsvg').addEventListener('change', (evt) => {
+    // take the first file
+    const file = evt.target.files[0];
+    // get filereader instance
+    const reader = new FileReader();
+    // get file extension
+    const filename = file.name;
+    const extension = filename.split('.').pop().toLowerCase();
+
+    // remove existing stuff
+    scene.remove(finalCurve);
+
+    switch (extension) {
+      case 'svg':
+        reader.addEventListener('load', (evt) => {
+          let contents = evt.target.result;
+          try {
+            // load the svg file in the parser
+            contents = contents.replace(/^[\s\S]*(<svg)/i, "$1");
+            document.getElementById('svg-result').innerHTML = contents;
+
+            const result = cvtPolygon(processSVG());
+            console.log(result);
+
+            // just set decimatedCurvePoints
+            decimatedCurvePoints = cvtShapeToObj(result, scribbleX, scribbleY, scribbleWidth, scribbleHeight);
+
+            drawDecimatedCurve();
+            splat();
+
+          } catch (err) {
+            alert('error in parsing file: ' + filename + ' - ' + err.message);
+          }
+        });
+        reader.readAsText(file);
+        break;
+    }
+  });
 }
 
 function setupMouseFunctions() {
@@ -182,7 +221,6 @@ function setupGui() {
           dat += finalCurvePoints[i].x + ' ' + finalCurvePoints[i].y + ' ' + finalCurvePoints[i].z + '\n';
         }
         const a = document.createElement('a');
-        // const json = JSON.stringify(dat);
         const blob = new Blob([dat], { type: 'plain/text' });
         const url = window.URL.createObjectURL(blob);
         a.href = url;
@@ -326,6 +364,16 @@ function setupGui() {
   // project curve params
   const curveProjFolder = gui.addFolder('Project 2D Curve');
   const curveProjObj = {
+    loadSVG() {
+      if (model.visible) {
+        curveProjDoneDrawBtn.enable();
+        curveProjDrawBtn.disable();
+        scribbleEnabled = true;
+      } else {
+        alert('no model visible');
+      }
+      document.getElementById('loadsvg').click();
+    },
     drawCurve() {
       if (model.visible) {
         curveProjDoneDrawBtn.enable();
@@ -435,6 +483,7 @@ function setupGui() {
   curveProjFolder.add(curveProjObj, 'loadDino').name('load dinosaur');
   curveProjFolder.add(curveProjObj, 'loadPig').name('load pig');
   curveProjFolder.add(curveProjObj, 'loadShark').name('load shark');
+  curveProjFolder.add(curveProjObj, 'loadSVG').name('load svg');
   const curveProjDoneDrawBtn = curveProjFolder.add(curveProjObj, 'closeScene').name('close window').disable();
 
   curveProjFolder.close();
@@ -868,6 +917,14 @@ function drawFinalCurve() {
   // console.log(finalCurve);
   // finalCurve = new THREE.Mesh(decal, material);
   scene.add(finalCurve);
+}
+
+function processSVG() {
+  const paths = document.querySelectorAll('#svg-result path');
+  if (paths.length > 1) alert('more than 1 path, using the first one');
+  const path = paths[0];
+  const points = pathToPoints(path.pathSegList);
+  return pointCommandsToCSSPoints(points)
 }
 
 function main() {
