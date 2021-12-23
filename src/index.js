@@ -3,6 +3,9 @@ import { GUI } from '../three/examples/jsm/libs/lil-gui.module.min.js'
 import { OBJLoader } from '../three/examples/jsm/loaders/OBJLoader.js'
 import { OrbitControls } from '../three/examples/jsm/controls/OrbitControls.js'
 import { DecalGeometry } from '../three/examples/jsm/geometries/DecalGeometry.js'
+import { Line2 } from '../three/examples/jsm/lines/Line2.js';
+import { LineMaterial } from '../three/examples/jsm/lines/LineMaterial.js';
+import { LineGeometry } from '../three/examples/jsm/lines/LineGeometry.js';
 
 import './simplify.js'
 import { cvtShapeToObj, pointCommandsToCSSPoints, cvtPolygon, pathToPoints, sharkShape, dinoShape, pigShape } from './svg.js'
@@ -11,7 +14,7 @@ let renderer, scene, camera, raycaster;
 let controls;
 let model;
 let lights;
-let finalCurve, finalCurvePoints = [], finalCurveColor = new THREE.Color(1, 0, 0);
+let finalCurve, finalCurvePoints = [], finalCurveColor = new THREE.Color(1, 0, 0), curveWidth = 1;
 let finalPos, finalOrient = new THREE.Vector3(), finalScale = new THREE.Vector3(1, 1, 1);
 
 const intersection = {
@@ -230,263 +233,274 @@ function setupGui() {
       }
     },
     curveColor: finalCurveColor,
+    lineWidth: curveWidth,
   };
   gui.add(commonObj, 'loadMesh').name('load mesh');
   gui.addColor(commonObj, 'curveColor').name('curve color').onChange((val) => {
     finalCurveColor = val;
     drawFinalCurve();
   });
+  gui.add(commonObj, 'lineWidth', 1, 20).name('curve width').onChange((val) => {
+    curveWidth = val;
+    drawFinalCurve();
+  })
   gui.add(commonObj, 'exportCurve').name('export curve');
 
-  // lighting params
-  const lightFolder = gui.addFolder('Viewer Parameters');
-  const dirLightParams = { 'dir light color': lights[0].color.getHex() };
-  const ambLightParams = { 'amb light color': lights[3].color.getHex(), 'amb intensity': lights[3].intensity };
-  const ptLightParams = { 'pt light color': lights[4].color.getHex(), 'pt intensity': lights[4].intensity }
-  lightFolder.addColor(dirLightParams, 'dir light color').onChange((val) => {
-    lights[0].color.setHex(val);
-    lights[1].color.setHex(val);
-    lights[2].color.setHex(val);
-  });
-  lightFolder.addColor(ambLightParams, 'amb light color').onChange((val) => lights[3].color.setHex(val));
-  lightFolder.add(ambLightParams, 'amb intensity', 0, 1).onChange((val) => lights[3].intensity = val);
-  lightFolder.addColor(ptLightParams, 'pt light color').onChange((val) => lights[4].color.setHex(val));
-  lightFolder.add(ptLightParams, 'pt intensity', 0, 1).onChange((val) => lights[4].intensity = val);
-  lightFolder.close();
+  // viewer params
+  {
+    const lightFolder = gui.addFolder('Viewer Parameters');
+    const dirLightParams = { 'dir light color': lights[0].color.getHex() };
+    const ambLightParams = { 'amb light color': lights[3].color.getHex(), 'amb intensity': lights[3].intensity };
+    const ptLightParams = { 'pt light color': lights[4].color.getHex(), 'pt intensity': lights[4].intensity }
+    lightFolder.addColor(dirLightParams, 'dir light color').onChange((val) => {
+      lights[0].color.setHex(val);
+      lights[1].color.setHex(val);
+      lights[2].color.setHex(val);
+    });
+    lightFolder.addColor(ambLightParams, 'amb light color').onChange((val) => lights[3].color.setHex(val));
+    lightFolder.add(ambLightParams, 'amb intensity', 0, 1).onChange((val) => lights[3].intensity = val);
+    lightFolder.addColor(ptLightParams, 'pt light color').onChange((val) => lights[4].color.setHex(val));
+    lightFolder.add(ptLightParams, 'pt intensity', 0, 1).onChange((val) => lights[4].intensity = val);
+    lightFolder.close();
+  }
 
   // 3d curve params
-  const curve3dFolder = gui.addFolder('Parametric 3D Curve');
+  {
+    const curve3dFolder = gui.addFolder('Parametric 3D Curve');
 
-  curve3dFolder.add(curve3dParams, 'modelView').name('show/hide model');
+    curve3dFolder.add(curve3dParams, 'modelView').name('show/hide model');
 
-  const paramFolder = curve3dFolder.addFolder('Parameters');
-  const aParam = paramFolder.add(curve3dParams, 'a', -10, 10).onChange(() => calc3DCurve());
-  const bParam = paramFolder.add(curve3dParams, 'b', -10, 10).onChange(() => calc3DCurve());
-  const cParam = paramFolder.add(curve3dParams, 'c', -10, 10).onChange(() => calc3DCurve());
-  const dParam = paramFolder.add(curve3dParams, 'd', -10, 10).onChange(() => calc3DCurve());
-  const eParam = paramFolder.add(curve3dParams, 'e', -10, 10).onChange(() => calc3DCurve());
-  const fParam = paramFolder.add(curve3dParams, 'f', -10, 10).onChange(() => calc3DCurve());
-  function setParams(params) {
-    const allParams = [aParam, bParam, cParam, dParam, eParam, fParam];
-    for (let i = 0; i < allParams.length; i++) {
-      allParams[i].disable();
-      if (i < params.length) {
-        allParams[i].enable();
-        allParams[i].setValue(params[i]);
+    const paramFolder = curve3dFolder.addFolder('Parameters');
+    const aParam = paramFolder.add(curve3dParams, 'a', -10, 10).onChange(() => calc3DCurve());
+    const bParam = paramFolder.add(curve3dParams, 'b', -10, 10).onChange(() => calc3DCurve());
+    const cParam = paramFolder.add(curve3dParams, 'c', -10, 10).onChange(() => calc3DCurve());
+    const dParam = paramFolder.add(curve3dParams, 'd', -10, 10).onChange(() => calc3DCurve());
+    const eParam = paramFolder.add(curve3dParams, 'e', -10, 10).onChange(() => calc3DCurve());
+    const fParam = paramFolder.add(curve3dParams, 'f', -10, 10).onChange(() => calc3DCurve());
+    function setParams(params) {
+      const allParams = [aParam, bParam, cParam, dParam, eParam, fParam];
+      for (let i = 0; i < allParams.length; i++) {
+        allParams[i].disable();
+        if (i < params.length) {
+          allParams[i].enable();
+          allParams[i].setValue(params[i]);
+        }
       }
     }
-  }
-  paramFolder.close();
+    paramFolder.close();
 
-  const xExprObj = curve3dFolder.add(curve3dParams, 'xExpr').name('x').onChange(() => { calc3DCurve(); setParams([1, 1, 1, 1, 1, 1]) });
-  const yExprObj = curve3dFolder.add(curve3dParams, 'yExpr').name('y').onChange(() => { calc3DCurve(); setParams([1, 1, 1, 1, 1, 1]) });
-  const zExprObj = curve3dFolder.add(curve3dParams, 'zExpr').name('z').onChange(() => { calc3DCurve(); setParams([1, 1, 1, 1, 1, 1]) });
-  const minTObj = curve3dFolder.add(curve3dParams, 'minT', -50, 50).name('t min').onChange(() => { calc3DCurve() });
-  const maxTObj = curve3dFolder.add(curve3dParams, 'maxT', -50, 50).name('t max').onChange(() => { calc3DCurve() });
-  curve3dFolder.add(curve3dParams, 'numSteps', 1, 1000, 1).name('num steps').onChange(() => { calc3DCurve() });
+    const xExprObj = curve3dFolder.add(curve3dParams, 'xExpr').name('x').onChange(() => { calc3DCurve(); setParams([1, 1, 1, 1, 1, 1]) });
+    const yExprObj = curve3dFolder.add(curve3dParams, 'yExpr').name('y').onChange(() => { calc3DCurve(); setParams([1, 1, 1, 1, 1, 1]) });
+    const zExprObj = curve3dFolder.add(curve3dParams, 'zExpr').name('z').onChange(() => { calc3DCurve(); setParams([1, 1, 1, 1, 1, 1]) });
+    const minTObj = curve3dFolder.add(curve3dParams, 'minT', -50, 50).name('t min').onChange(() => { calc3DCurve() });
+    const maxTObj = curve3dFolder.add(curve3dParams, 'maxT', -50, 50).name('t max').onChange(() => { calc3DCurve() });
+    curve3dFolder.add(curve3dParams, 'numSteps', 1, 1000, 1).name('num steps').onChange(() => { calc3DCurve() });
 
-  const curveObjs = {
-    hideModel() {
-      if (!scribbleEnabled) {
-        model.visible = false;
-        indicator.visible = false;
-      } else {
-        alert('exit 2d curve mode first');
+    const curveObjs = {
+      hideModel() {
+        if (!scribbleEnabled) {
+          model.visible = false;
+          indicator.visible = false;
+        } else {
+          alert('exit 2d curve mode first');
+        }
+      },
+      trefoil() {
+        this.hideModel();
+        xExprObj.setValue('a sin(t) + b sin((f - 1)t)');
+        yExprObj.setValue('c cos(t) - d cos((f - 1)t)');
+        zExprObj.setValue('-e sin(ft)');
+        minTObj.setValue(0);
+        maxTObj.setValue(2 * Math.PI);
+        setParams([1, 2, 1, 2, 2, 3]);
+      },
+      lissajous() {
+        this.hideModel();
+        xExprObj.setValue('a * cos(b * t * pi)');
+        yExprObj.setValue('b * cos((a * t + 1 / (2 * b)) * pi)');
+        zExprObj.setValue('cos(((2ab - a - b)t + 3/4) * pi)');
+        minTObj.setValue(0);
+        maxTObj.setValue(2);
+        setParams([3, 2]);
+      },
+      epitrochoid() {
+        this.hideModel();
+        xExprObj.setValue('(a + b cos(c))cos(t) - bd(cos(c) cos(at/b)cos(t) - sin(at/b)sin(t))');
+        yExprObj.setValue('bsin(c)(1 - dcos(at/b))');
+        zExprObj.setValue('(a + b cos(c))sin(t) - bd(cos(c) cos(at/b)sin(t) - sin(at/b)cos(t))');
+        minTObj.setValue(0);
+        maxTObj.setValue(2 * Math.PI);
+        setParams([1, 1 / 4, Math.PI / 2, 1]);
+      },
+      spirograph() {
+        this.hideModel();
+        xExprObj.setValue('(a - b)cos(t) + c cos((a-b)t/b)');
+        yExprObj.setValue('((a - b)sin(t) - c sin((a-b)t/b))cos(dt)');
+        zExprObj.setValue('((a - b)sin(t) - c sin((a-b)t/b))sin(dt)');
+        minTObj.setValue(0);
+        maxTObj.setValue(6 * Math.PI);
+        setParams([4, 3, 1.2, 2]);
+      },
+      clelia() {
+        this.hideModel();
+        xExprObj.setValue('a cos(bt)cos(t)');
+        yExprObj.setValue('a cos(bt)sin(t)');
+        zExprObj.setValue('a sin(bt)');
+        minTObj.setValue(0);
+        maxTObj.setValue(2 * Math.PI);
+        setParams([1, 2]);
+      },
+      tennis() {
+        this.hideModel();
+        xExprObj.setValue('a cos(t) + b cos(ct)');
+        yExprObj.setValue('a sin(t) + b sin(ct)');
+        zExprObj.setValue('d sin((c-1)t)');
+        minTObj.setValue(0);
+        maxTObj.setValue(2 * Math.PI);
+        setParams([1, 1, 3, 2]);
       }
-    },
-    trefoil() {
-      this.hideModel();
-      xExprObj.setValue('a sin(t) + b sin((f - 1)t)');
-      yExprObj.setValue('c cos(t) - d cos((f - 1)t)');
-      zExprObj.setValue('-e sin(ft)');
-      minTObj.setValue(0);
-      maxTObj.setValue(2 * Math.PI);
-      setParams([1, 2, 1, 2, 2, 3]);
-    },
-    lissajous() {
-      this.hideModel();
-      xExprObj.setValue('a * cos(b * t * pi)');
-      yExprObj.setValue('b * cos((a * t + 1 / (2 * b)) * pi)');
-      zExprObj.setValue('cos(((2ab - a - b)t + 3/4) * pi)');
-      minTObj.setValue(0);
-      maxTObj.setValue(2);
-      setParams([3, 2]);
-    },
-    epitrochoid() {
-      this.hideModel();
-      xExprObj.setValue('(a + b cos(c))cos(t) - bd(cos(c) cos(at/b)cos(t) - sin(at/b)sin(t))');
-      yExprObj.setValue('bsin(c)(1 - dcos(at/b))');
-      zExprObj.setValue('(a + b cos(c))sin(t) - bd(cos(c) cos(at/b)sin(t) - sin(at/b)cos(t))');
-      minTObj.setValue(0);
-      maxTObj.setValue(2 * Math.PI);
-      setParams([1, 1 / 4, Math.PI / 2, 1]);
-    },
-    spirograph() {
-      this.hideModel();
-      xExprObj.setValue('(a - b)cos(t) + c cos((a-b)t/b)');
-      yExprObj.setValue('((a - b)sin(t) - c sin((a-b)t/b))cos(dt)');
-      zExprObj.setValue('((a - b)sin(t) - c sin((a-b)t/b))sin(dt)');
-      minTObj.setValue(0);
-      maxTObj.setValue(6 * Math.PI);
-      setParams([4, 3, 1.2, 2]);
-    },
-    clelia() {
-      this.hideModel();
-      xExprObj.setValue('a cos(bt)cos(t)');
-      yExprObj.setValue('a cos(bt)sin(t)');
-      zExprObj.setValue('a sin(bt)');
-      minTObj.setValue(0);
-      maxTObj.setValue(2 * Math.PI);
-      setParams([1, 2]);
-    },
-    tennis() {
-      this.hideModel();
-      xExprObj.setValue('a cos(t) + b cos(ct)');
-      yExprObj.setValue('a sin(t) + b sin(ct)');
-      zExprObj.setValue('d sin((c-1)t)');
-      minTObj.setValue(0);
-      maxTObj.setValue(2 * Math.PI);
-      setParams([1, 1, 3, 2]);
     }
+
+    const presets = curve3dFolder.addFolder('presets');
+    presets.add(curveObjs, 'trefoil');
+    presets.add(curveObjs, 'lissajous');
+    presets.add(curveObjs, 'epitrochoid');
+    presets.add(curveObjs, 'spirograph');
+    presets.add(curveObjs, 'clelia');
+    presets.add(curveObjs, 'tennis');
+    presets.close();
+
+    curve3dFolder.close();
   }
-
-  const presets = curve3dFolder.addFolder('presets');
-  presets.add(curveObjs, 'trefoil');
-  presets.add(curveObjs, 'lissajous');
-  presets.add(curveObjs, 'epitrochoid');
-  presets.add(curveObjs, 'spirograph');
-  presets.add(curveObjs, 'clelia');
-  presets.add(curveObjs, 'tennis');
-  presets.close();
-
-  curve3dFolder.close();
 
   // project curve params
-  const curveProjFolder = gui.addFolder('Project 2D Curve');
-  const curveProjObj = {
-    loadSVG() {
-      if (model.visible) {
-        curveProjDoneDrawBtn.enable();
-        curveProjDrawBtn.disable();
-        scribbleEnabled = true;
-      } else {
-        alert('no model visible');
-      }
-      document.getElementById('loadsvg').click();
-    },
-    drawCurve() {
-      if (model.visible) {
-        curveProjDoneDrawBtn.enable();
-        curveProjDrawBtn.disable();
-        scribbleEnabled = true;
-      } else {
-        alert('no model visible');
-      }
-    },
-    closeScene() {
-      curveProjDoneDrawBtn.disable();
-      curveProjDrawBtn.enable();
-      scribbleEnabled = false;
-      scribbling = false;
+  {
+    const curveProjFolder = gui.addFolder('Project 2D Curve');
+    const curveProjObj = {
+      loadSVG() {
+        if (model.visible) {
+          curveProjDoneDrawBtn.enable();
+          curveProjDrawBtn.disable();
+          scribbleEnabled = true;
+        } else {
+          alert('no model visible');
+        }
+        document.getElementById('loadsvg').click();
+      },
+      drawCurve() {
+        if (model.visible) {
+          curveProjDoneDrawBtn.enable();
+          curveProjDrawBtn.disable();
+          scribbleEnabled = true;
+        } else {
+          alert('no model visible');
+        }
+      },
+      closeScene() {
+        curveProjDoneDrawBtn.disable();
+        curveProjDrawBtn.enable();
+        scribbleEnabled = false;
+        scribbling = false;
 
-      scribbleScene.remove(scribble);
-      scribble = null;
-      scribblePoints.length = 0;
-      scribbleScene.remove(decimatedCurve);
-      decimatedCurve = null;
-      scribbleScene.remove(splineCurve);
-      splineCurve = null;
-      splineCurvePoints.length = 0;
-      for (let i = 0; i < decimatedHandles.length; i++) {
-        scribbleScene.remove(decimatedHandles[i]);
-      }
-    },
-    loadDino() {
-      this.drawCurve();
-      decimatedCurvePoints = cvtShapeToObj(dinoShape, scribbleX, scribbleY, scribbleWidth, scribbleHeight);
-      drawDecimatedCurve();
+        scribbleScene.remove(scribble);
+        scribble = null;
+        scribblePoints.length = 0;
+        scribbleScene.remove(decimatedCurve);
+        decimatedCurve = null;
+        scribbleScene.remove(splineCurve);
+        splineCurve = null;
+        splineCurvePoints.length = 0;
+        for (let i = 0; i < decimatedHandles.length; i++) {
+          scribbleScene.remove(decimatedHandles[i]);
+        }
+      },
+      loadDino() {
+        this.drawCurve();
+        decimatedCurvePoints = cvtShapeToObj(dinoShape, scribbleX, scribbleY, scribbleWidth, scribbleHeight);
+        drawDecimatedCurve();
+        splat();
+      },
+      loadPig() {
+        this.drawCurve();
+        decimatedCurvePoints = cvtShapeToObj(pigShape, scribbleX, scribbleY, scribbleWidth, scribbleHeight);
+        drawDecimatedCurve();
+        splat();
+      },
+      loadShark() {
+        this.drawCurve();
+        console.log(sharkShape);
+        decimatedCurvePoints = cvtShapeToObj(sharkShape, scribbleX, scribbleY, scribbleWidth, scribbleHeight);
+        drawDecimatedCurve();
+        splat();
+      },
+      width: scribbleWidth,
+      height: scribbleHeight,
+      x: scribbleX,
+      y: scribbleY
+    };
+    const curveProjDrawBtn = curveProjFolder.add(curveProjObj, 'drawCurve').name('draw curve');
+
+    const curveProjPosFolder = curveProjFolder.addFolder('Window positions');
+    curveProjPosFolder.add(curveProjObj, 'width', 0, container.clientWidth).onChange((val) => {
+      scribbleWidth = val;
+      updateScribbleCam();
+    });
+    curveProjPosFolder.add(curveProjObj, 'height', 0, container.clientHeight).onChange((val) => {
+      scribbleHeight = val;
+      updateScribbleCam();
+    });
+    curveProjPosFolder.add(curveProjObj, 'x', 0, container.clientWidth).onChange((val) => {
+      scribbleX = val;
+      updateScribbleCam();
+    });
+    curveProjPosFolder.add(curveProjObj, 'y', 0, container.clientHeight).onChange((val) => {
+      scribbleY = val;
+      updateScribbleCam();
+    });
+    curveProjPosFolder.close();
+
+    curveProjFolder.add({ s: scribbleDelta }, 's', 1, 10).name('stickiness').onChange((val) => scribbleDelta = val);
+
+    const curveProjSmoothFolder = curveProjFolder.addFolder('Smoothing parameters');
+    curveProjSmoothFolder.add(smootherParams, 'epsilon', 0, 50).onChange(() => {
+      decimateCurve();
       splat();
-    },
-    loadPig() {
-      this.drawCurve();
-      decimatedCurvePoints = cvtShapeToObj(pigShape, scribbleX, scribbleY, scribbleWidth, scribbleHeight);
-      drawDecimatedCurve();
+    });
+    curveProjSmoothFolder.add(smootherParams, 'alpha', 0, 1).onChange(() => {
+      decimateCurve();
       splat();
-    },
-    loadShark() {
-      this.drawCurve();
-      console.log(sharkShape);
-      decimatedCurvePoints = cvtShapeToObj(sharkShape, scribbleX, scribbleY, scribbleWidth, scribbleHeight);
-      drawDecimatedCurve();
+    });
+    curveProjSmoothFolder.add(smootherParams, 'n_segs', 1, 50, 1).onChange(() => {
+      decimateCurve();
       splat();
-    },
-    width: scribbleWidth,
-    height: scribbleHeight,
-    x: scribbleX,
-    y: scribbleY
-  };
-  const curveProjDrawBtn = curveProjFolder.add(curveProjObj, 'drawCurve').name('draw curve');
+    });
+    curveProjSmoothFolder.close();
 
-  const curveProjPosFolder = curveProjFolder.addFolder('Window positions');
-  curveProjPosFolder.add(curveProjObj, 'width', 0, container.clientWidth).onChange((val) => {
-    scribbleWidth = val;
-    updateScribbleCam();
-  });
-  curveProjPosFolder.add(curveProjObj, 'height', 0, container.clientHeight).onChange((val) => {
-    scribbleHeight = val;
-    updateScribbleCam();
-  });
-  curveProjPosFolder.add(curveProjObj, 'x', 0, container.clientWidth).onChange((val) => {
-    scribbleX = val;
-    updateScribbleCam();
-  });
-  curveProjPosFolder.add(curveProjObj, 'y', 0, container.clientHeight).onChange((val) => {
-    scribbleY = val;
-    updateScribbleCam();
-  });
-  curveProjPosFolder.close();
+    const splatScaleObj = { width: finalScale.x, height: finalScale.y, thickness: finalScale.z, rotation: finalOrient.z };
+    curveProjFolder.add(splatScaleObj, 'width', 1, 20).onChange((val) => {
+      finalScale.x = val;
+      if (finalCurvePoints.length > 0) splat();
+    });
+    curveProjFolder.add(splatScaleObj, 'height', 1, 20).onChange((val) => {
+      finalScale.y = val;
+      if (finalCurvePoints.length > 0) splat();
+    });
+    curveProjFolder.add(splatScaleObj, 'thickness', 0, 5).onChange((val) => {
+      finalScale.z = val;
+      if (finalCurvePoints.length > 0) splat();
+    });
+    curveProjFolder.add(splatScaleObj, 'rotation', 0, 360).onChange((val) => {
+      finalOrient.z = val / 180 * Math.PI;
+      if (finalCurvePoints.length > 0) splat();
+    });
+    curveProjFolder.add(curveProjObj, 'loadDino').name('load dinosaur');
+    curveProjFolder.add(curveProjObj, 'loadPig').name('load pig');
+    curveProjFolder.add(curveProjObj, 'loadShark').name('load shark');
+    curveProjFolder.add(curveProjObj, 'loadSVG').name('load svg');
+    const curveProjDoneDrawBtn = curveProjFolder.add(curveProjObj, 'closeScene').name('close window').disable();
 
-  curveProjFolder.add({ s: scribbleDelta }, 's', 1, 10).name('stickiness').onChange((val) => scribbleDelta = val);
-
-  const curveProjSmoothFolder = curveProjFolder.addFolder('Smoothing parameters');
-  curveProjSmoothFolder.add(smootherParams, 'epsilon', 0, 50).onChange(() => {
-    decimateCurve();
-    splat();
-  });
-  curveProjSmoothFolder.add(smootherParams, 'alpha', 0, 1).onChange(() => {
-    decimateCurve();
-    splat();
-  });
-  curveProjSmoothFolder.add(smootherParams, 'n_segs', 1, 50, 1).onChange(() => {
-    decimateCurve();
-    splat();
-  });
-  curveProjSmoothFolder.close();
-
-  const splatScaleObj = { width: finalScale.x, height: finalScale.y, thickness: finalScale.z, rotation: finalOrient.z };
-  curveProjFolder.add(splatScaleObj, 'width', 1, 20).onChange((val) => {
-    finalScale.x = val;
-    if (finalCurvePoints.length > 0) splat();
-  });
-  curveProjFolder.add(splatScaleObj, 'height', 1, 20).onChange((val) => {
-    finalScale.y = val;
-    if (finalCurvePoints.length > 0) splat();
-  });
-  curveProjFolder.add(splatScaleObj, 'thickness', 0, 5).onChange((val) => {
-    finalScale.z = val;
-    if (finalCurvePoints.length > 0) splat();
-  });
-  curveProjFolder.add(splatScaleObj, 'rotation', 0, 360).onChange((val) => {
-    finalOrient.z = val / 180 * Math.PI;
-    if (finalCurvePoints.length > 0) splat();
-  });
-  curveProjFolder.add(curveProjObj, 'loadDino').name('load dinosaur');
-  curveProjFolder.add(curveProjObj, 'loadPig').name('load pig');
-  curveProjFolder.add(curveProjObj, 'loadShark').name('load shark');
-  curveProjFolder.add(curveProjObj, 'loadSVG').name('load svg');
-  const curveProjDoneDrawBtn = curveProjFolder.add(curveProjObj, 'closeScene').name('close window').disable();
-
-  curveProjFolder.close();
+    curveProjFolder.close();
+  }
 
   gui.add({ reset() { gui.reset() } }, 'reset').name('reset params');
   gui.add({ reset() { controls.reset() } }, 'reset').name('reset camera');
@@ -913,7 +927,13 @@ function drawFinalCurve() {
 
   // create the finalCurve mesh and add it to the scene
   const geom = new THREE.BufferGeometry().setFromPoints(finalCurvePoints)
-  finalCurve = new THREE.Line(geom, new THREE.LineBasicMaterial({ color: finalCurveColor }));
+  const line_tmp = new THREE.Line(geom, new THREE.LineBasicMaterial({ color: finalCurveColor }));
+
+  const geom2 = new LineGeometry().fromLine(line_tmp);
+  const mat2 = new LineMaterial({ color: finalCurveColor, linewidth: curveWidth / 1000 });
+  finalCurve = new Line2(geom2, mat2);
+  finalCurve.computeLineDistances();
+
   // console.log(finalCurve);
   // finalCurve = new THREE.Mesh(decal, material);
   scene.add(finalCurve);
