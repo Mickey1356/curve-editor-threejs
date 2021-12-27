@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+
+<head>
+  <title>ThreeJS App</title>
+  <link rel='stylesheet' href='./css/style.css'>
+  </style>
+  <script src='./src/pathseg.js'></script>
+  <script type='module' src='./src/projection.js'></script>
+</head>
+
+<body oncontextmenu="return false;">
+  <div id='title'>
+    <p>
+      <a href="parametric.html">Parametric Curve</a> &nbsp;
+      <a href="projection.html">2D Curve Projection</a>
+    </p>
+    <p>2D Curve Projection</p>
+    <input type='file' id='loadmesh' style='visibility: hidden' accept='.obj' />
+    <input type='file' id='loadsvg' style='visibility: hidden' accept='.svg' />
+    <div id='svg-result' style='visibility: hidden; width: 0; height: 0;'></div>
+  </div>
+  <div id='canvas'></div>
+</body>

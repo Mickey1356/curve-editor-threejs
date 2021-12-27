@@ -14,7 +14,7 @@ let renderer, scene, camera, raycaster;
 let controls;
 let model;
 let lights;
-let finalCurve, finalCurvePoints = [], finalCurveColor = new THREE.Color(1, 0, 0), curveWidth = 1;
+let finalCurve, finalCurvePoints = [], finalCurveColor = new THREE.Color(1, 0, 0), curveWidth = 3;
 let finalPos, finalOrient = new THREE.Vector3(), finalScale = new THREE.Vector3(1, 1, 1);
 
 const intersection = {
@@ -24,7 +24,7 @@ const intersection = {
 };
 let mouseHelper, indicator, xInd, yInd, zInd;
 
-const container = document.getElementById('canvas');
+let container = document.getElementById('canvas');
 const clock = new THREE.Clock();
 const objloader = new OBJLoader();
 
@@ -56,42 +56,22 @@ const dragIntersection = {
   dragged: false,
 };
 
-// 3d curve params
-const curve3dParams = {
-  modelView() {
-    if (!scribbleEnabled) {
-      model.visible = !model.visible;
-      indicator.visible = !indicator.visible;
-    } else {
-      alert('exit 2d curve mode first');
-    }
-  },
-  a: 1, b: 1, c: 1, d: 1, e: 1, f: 1, t: 0,
-  xExpr: '0',
-  yExpr: '0',
-  zExpr: '0',
-  minT: 0,
-  maxT: 1,
-  numSteps: 200,
-};
-// let xExpr = '0', yExpr = '0', zExpr = '0', minT = 0, maxT = 1, numSteps = 200;
-
 function setupLights() {
   // directional lights
-  const light = new THREE.DirectionalLight(0x8f8f8f);
+  const light = new THREE.DirectionalLight(0x555555);
   light.position.set(-1, 1, 1);
   scene.add(light);
-  const light2 = new THREE.DirectionalLight(0x8f8f8f);
+  const light2 = new THREE.DirectionalLight(0x555555);
   light2.position.set(1, 1, 1);
   scene.add(light2);
-  const light3 = new THREE.DirectionalLight(0x8f8f8f);
+  const light3 = new THREE.DirectionalLight(0x555555);
   light3.position.set(0, -1, -1);
   scene.add(light3);
   // small ambient light
-  const ambientLight = new THREE.AmbientLight(0x808080, 0.2);
+  const ambientLight = new THREE.AmbientLight(0x808080, 0.5);
   scene.add(ambientLight);
   // point light to camera
-  const pointLight = new THREE.PointLight(0xaaaaaa, 0.5);
+  const pointLight = new THREE.PointLight(0xaaaaaa, 0.25);
   camera.add(pointLight);
   scene.add(camera);
 
@@ -135,7 +115,6 @@ function setupDomGuiEvents() {
         break;
     }
   });
-
   document.getElementById('loadsvg').addEventListener('change', (evt) => {
     // take the first file
     const file = evt.target.files[0];
@@ -264,119 +243,14 @@ function setupGui() {
     lightFolder.close();
   }
 
-  // 3d curve params
-  {
-    const curve3dFolder = gui.addFolder('Parametric 3D Curve');
-
-    curve3dFolder.add(curve3dParams, 'modelView').name('show/hide model');
-
-    const paramFolder = curve3dFolder.addFolder('Parameters');
-    const aParam = paramFolder.add(curve3dParams, 'a', -10, 10).onChange(() => calc3DCurve());
-    const bParam = paramFolder.add(curve3dParams, 'b', -10, 10).onChange(() => calc3DCurve());
-    const cParam = paramFolder.add(curve3dParams, 'c', -10, 10).onChange(() => calc3DCurve());
-    const dParam = paramFolder.add(curve3dParams, 'd', -10, 10).onChange(() => calc3DCurve());
-    const eParam = paramFolder.add(curve3dParams, 'e', -10, 10).onChange(() => calc3DCurve());
-    const fParam = paramFolder.add(curve3dParams, 'f', -10, 10).onChange(() => calc3DCurve());
-    function setParams(params) {
-      const allParams = [aParam, bParam, cParam, dParam, eParam, fParam];
-      for (let i = 0; i < allParams.length; i++) {
-        allParams[i].disable();
-        if (i < params.length) {
-          allParams[i].enable();
-          allParams[i].setValue(params[i]);
-        }
-      }
-    }
-    paramFolder.close();
-
-    const xExprObj = curve3dFolder.add(curve3dParams, 'xExpr').name('x').onChange(() => { calc3DCurve(); setParams([1, 1, 1, 1, 1, 1]) });
-    const yExprObj = curve3dFolder.add(curve3dParams, 'yExpr').name('y').onChange(() => { calc3DCurve(); setParams([1, 1, 1, 1, 1, 1]) });
-    const zExprObj = curve3dFolder.add(curve3dParams, 'zExpr').name('z').onChange(() => { calc3DCurve(); setParams([1, 1, 1, 1, 1, 1]) });
-    const minTObj = curve3dFolder.add(curve3dParams, 'minT', -50, 50).name('t min').onChange(() => { calc3DCurve() });
-    const maxTObj = curve3dFolder.add(curve3dParams, 'maxT', -50, 50).name('t max').onChange(() => { calc3DCurve() });
-    curve3dFolder.add(curve3dParams, 'numSteps', 1, 1000, 1).name('num steps').onChange(() => { calc3DCurve() });
-
-    const curveObjs = {
-      hideModel() {
-        if (!scribbleEnabled) {
-          model.visible = false;
-          indicator.visible = false;
-        } else {
-          alert('exit 2d curve mode first');
-        }
-      },
-      trefoil() {
-        this.hideModel();
-        xExprObj.setValue('a sin(t) + b sin((f - 1)t)');
-        yExprObj.setValue('c cos(t) - d cos((f - 1)t)');
-        zExprObj.setValue('-e sin(ft)');
-        minTObj.setValue(0);
-        maxTObj.setValue(2 * Math.PI);
-        setParams([1, 2, 1, 2, 2, 3]);
-      },
-      lissajous() {
-        this.hideModel();
-        xExprObj.setValue('a * cos(b * t * pi)');
-        yExprObj.setValue('b * cos((a * t + 1 / (2 * b)) * pi)');
-        zExprObj.setValue('cos(((2ab - a - b)t + 3/4) * pi)');
-        minTObj.setValue(0);
-        maxTObj.setValue(2);
-        setParams([3, 2]);
-      },
-      epitrochoid() {
-        this.hideModel();
-        xExprObj.setValue('(a + b cos(c))cos(t) - bd(cos(c) cos(at/b)cos(t) - sin(at/b)sin(t))');
-        yExprObj.setValue('bsin(c)(1 - dcos(at/b))');
-        zExprObj.setValue('(a + b cos(c))sin(t) - bd(cos(c) cos(at/b)sin(t) - sin(at/b)cos(t))');
-        minTObj.setValue(0);
-        maxTObj.setValue(2 * Math.PI);
-        setParams([1, 1 / 4, Math.PI / 2, 1]);
-      },
-      spirograph() {
-        this.hideModel();
-        xExprObj.setValue('(a - b)cos(t) + c cos((a-b)t/b)');
-        yExprObj.setValue('((a - b)sin(t) - c sin((a-b)t/b))cos(dt)');
-        zExprObj.setValue('((a - b)sin(t) - c sin((a-b)t/b))sin(dt)');
-        minTObj.setValue(0);
-        maxTObj.setValue(6 * Math.PI);
-        setParams([4, 3, 1.2, 2]);
-      },
-      clelia() {
-        this.hideModel();
-        xExprObj.setValue('a cos(bt)cos(t)');
-        yExprObj.setValue('a cos(bt)sin(t)');
-        zExprObj.setValue('a sin(bt)');
-        minTObj.setValue(0);
-        maxTObj.setValue(2 * Math.PI);
-        setParams([1, 2]);
-      },
-      tennis() {
-        this.hideModel();
-        xExprObj.setValue('a cos(t) + b cos(ct)');
-        yExprObj.setValue('a sin(t) + b sin(ct)');
-        zExprObj.setValue('d sin((c-1)t)');
-        minTObj.setValue(0);
-        maxTObj.setValue(2 * Math.PI);
-        setParams([1, 1, 3, 2]);
-      }
-    }
-
-    const presets = curve3dFolder.addFolder('presets');
-    presets.add(curveObjs, 'trefoil');
-    presets.add(curveObjs, 'lissajous');
-    presets.add(curveObjs, 'epitrochoid');
-    presets.add(curveObjs, 'spirograph');
-    presets.add(curveObjs, 'clelia');
-    presets.add(curveObjs, 'tennis');
-    presets.close();
-
-    curve3dFolder.close();
-  }
-
   // project curve params
   {
     const curveProjFolder = gui.addFolder('Project 2D Curve');
     const curveProjObj = {
+      hideModel() {
+        model.visible = !model.visible;
+        indicator.visible = !indicator.visible;
+      },
       loadSVG() {
         if (model.visible) {
           curveProjDoneDrawBtn.enable();
@@ -428,7 +302,6 @@ function setupGui() {
       },
       loadShark() {
         this.drawCurve();
-        console.log(sharkShape);
         decimatedCurvePoints = cvtShapeToObj(sharkShape, scribbleX, scribbleY, scribbleWidth, scribbleHeight);
         drawDecimatedCurve();
         splat();
@@ -438,7 +311,9 @@ function setupGui() {
       x: scribbleX,
       y: scribbleY
     };
-    const curveProjDrawBtn = curveProjFolder.add(curveProjObj, 'drawCurve').name('draw curve');
+    curveProjFolder.add(curveProjObj, 'hideModel').name('show/hide model');
+    const curveProjDrawBtn = curveProjFolder.add(curveProjObj, 'drawCurve').name('open draw window');
+    const curveProjDoneDrawBtn = curveProjFolder.add(curveProjObj, 'closeScene').name('close draw window').disable();
 
     const curveProjPosFolder = curveProjFolder.addFolder('Window positions');
     curveProjPosFolder.add(curveProjObj, 'width', 0, container.clientWidth).onChange((val) => {
@@ -497,9 +372,6 @@ function setupGui() {
     curveProjFolder.add(curveProjObj, 'loadPig').name('load pig');
     curveProjFolder.add(curveProjObj, 'loadShark').name('load shark');
     curveProjFolder.add(curveProjObj, 'loadSVG').name('load svg');
-    const curveProjDoneDrawBtn = curveProjFolder.add(curveProjObj, 'closeScene').name('close window').disable();
-
-    curveProjFolder.close();
   }
 
   gui.add({ reset() { gui.reset() } }, 'reset').name('reset params');
@@ -534,7 +406,7 @@ function mousePressed(evt) {
 
       }
 
-      if (intersection.intersects) {
+      if (model.visible && intersection.intersects) {
         finalPos = intersection.point.clone();
         finalOrient = mouseHelper.rotation.clone();
         splat();
@@ -636,6 +508,17 @@ function setupIndicators() {
   xInd = new THREE.Line(geomX, new THREE.LineBasicMaterial({ color: 0xaa0000 }));
   yInd = new THREE.Line(geomY, new THREE.LineBasicMaterial({ color: 0x00aa00 }));
   zInd = new THREE.Line(geomZ, new THREE.LineBasicMaterial({ color: 0x0000aa }));
+
+  const geomX2 = new LineGeometry().fromLine(xInd);
+  xInd = new Line2(geomX2, new LineMaterial({ color: 0xaa0000, linewidth: 0.005 }));
+  xInd.computeLineDistances();
+  const geomY2 = new LineGeometry().fromLine(yInd);
+  yInd = new Line2(geomY2, new LineMaterial({ color: 0x00aa00, linewidth: 0.005 }));
+  yInd.computeLineDistances();
+  const geomZ2 = new LineGeometry().fromLine(zInd);
+  zInd = new Line2(geomZ2, new LineMaterial({ color: 0x0000aa, linewidth: 0.005 }));
+  zInd.computeLineDistances();
+
   scene.add(xInd, yInd, zInd);
 }
 
@@ -860,68 +743,6 @@ function splat() {
   drawFinalCurve();
 }
 
-function getParamTkn() {
-  const arr = ['a', 'b', 'c', 'd', 'e', 'f'];
-  const ret = [];
-  for (let i = 0; i < arr.length; i++) {
-    ret.push({ type: 3, token: arr[i], show: arr[i], value: arr[i] });
-  }
-  return ret;
-}
-
-function calc3DCurve() {
-  finalCurvePoints.length = 0;
-
-  const tkn = {
-    type: 3,
-    token: 't',
-    show: 't',
-    value: 't'
-  }
-  const sinTkn = {
-    type: 0,
-    token: 'sin',
-    show: 'sin',
-    value: (a) => { return Math.sin(a) }
-  };
-  const cosTkn = {
-    type: 0,
-    token: 'cos',
-    show: 'cos',
-    value: (a) => { return Math.cos(a) }
-  };
-  const tanTkn = {
-    type: 0,
-    token: 'tan',
-    show: 'tan',
-    value: (a) => { return Math.tan(a) }
-  };
-  const sqrtTkn = {
-    type: 0,
-    token: 'sqrt',
-    show: 'sqrt',
-    value: (a) => { return Math.sqrt(a) }
-  };
-  const tkns = getParamTkn();
-  tkns.push(tkn, sinTkn, cosTkn, tanTkn, sqrtTkn);
-
-  for (let i = 0; i < curve3dParams.numSteps; i++) {
-    const t = i * (curve3dParams.maxT - curve3dParams.minT) / (curve3dParams.numSteps - 1) + curve3dParams.minT;
-
-    try {
-      curve3dParams.t = t;
-      const x = mexp.eval(curve3dParams.xExpr, tkns, curve3dParams);
-      const y = mexp.eval(curve3dParams.yExpr, tkns, curve3dParams);
-      const z = mexp.eval(curve3dParams.zExpr, tkns, curve3dParams);
-      finalCurvePoints.push(new THREE.Vector3(x, y, z));
-    } catch (err) {
-      console.log(err);
-    }
-  }
-
-  drawFinalCurve();
-}
-
 function drawFinalCurve() {
   scene.remove(finalCurve);
 
@@ -956,13 +777,18 @@ function main() {
 
   // init scene
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x000000);
+  scene.background = new THREE.Color(0xffffff);
+
+  // grid
+  const gridHelper = new THREE.GridHelper(10, 10, 0x222222, 0xaaaaaa);
+  scene.add(gridHelper);
 
   // load cube as model
   const geometry = new THREE.BoxGeometry(5, 5, 5);
   model = new THREE.Mesh(geometry, material);
   scene.add(model);
 
+  // axis and hover
   setupIndicators();
 
   // init camera
@@ -987,7 +813,7 @@ function main() {
 
   // setup 2d curve scribble scene
   scribbleScene = new THREE.Scene();
-  scribbleScene.background = new THREE.Color(0xffffff);
+  scribbleScene.background = new THREE.Color(0xaaaaaa);
   scribbleCamera = new THREE.OrthographicCamera(0, 0, 0, 0, -scribbleHeight, scribbleHeight);
   // add a small cross indicator to mark the center
   const centerLocX = scribbleX + scribbleWidth / 2, centerLocY = scribbleY + scribbleHeight / 2;
