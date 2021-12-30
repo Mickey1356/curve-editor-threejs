@@ -170,6 +170,10 @@ function setupGui() {
 
   // create an obj that loads a mesh
   const commonObj = {
+    loadMesh() {
+      indicator.visible = true;
+      document.getElementById('loadmesh').click();
+    },
     exportCurve() {
       Common.exportCurve(finalCurvePoints);
     },
@@ -179,6 +183,7 @@ function setupGui() {
     curveColor: finalCurveColor,
     lineWidth: curveWidth,
   };
+  gui.add(commonObj, 'loadMesh').name('load mesh');
   gui.addColor(commonObj, 'curveColor').name('curve color').onChange((val) => {
     finalCurveColor = val;
     drawFinalCurve();
