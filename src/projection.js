@@ -10,6 +10,8 @@ import { LineGeometry } from '../three/examples/jsm/lines/LineGeometry.js';
 import './simplify.js'
 import { cvtShapeToObj, pointCommandsToCSSPoints, cvtPolygon, pathToPoints, sharkShape, dinoShape, pigShape } from './svg.js'
 
+import * as Common from './common.js'
+
 let renderer, scene, camera, raycaster;
 let controls;
 let model;
@@ -55,28 +57,6 @@ const dragIntersection = {
   draggedObject: null,
   dragged: false,
 };
-
-function setupLights() {
-  // directional lights
-  const light = new THREE.DirectionalLight(0x555555);
-  light.position.set(-1, 1, 1);
-  scene.add(light);
-  const light2 = new THREE.DirectionalLight(0x555555);
-  light2.position.set(1, 1, 1);
-  scene.add(light2);
-  const light3 = new THREE.DirectionalLight(0x555555);
-  light3.position.set(0, -1, -1);
-  scene.add(light3);
-  // small ambient light
-  const ambientLight = new THREE.AmbientLight(0x808080, 0.5);
-  scene.add(ambientLight);
-  // point light to camera
-  const pointLight = new THREE.PointLight(0xaaaaaa, 0.25);
-  camera.add(pointLight);
-  scene.add(camera);
-
-  lights = [light, light2, light3, ambientLight, pointLight];
-}
 
 function setupDomGuiEvents() {
   document.getElementById('loadmesh').addEventListener('change', (evt) => {
@@ -190,31 +170,15 @@ function setupGui() {
 
   // create an obj that loads a mesh
   const commonObj = {
-    loadMesh() {
-      indicator.visible = true;
-      document.getElementById('loadmesh').click();
-    },
     exportCurve() {
-      if (finalCurvePoints.length == 0) {
-        alert('no curve to export');
-      } else {
-        let dat = '';
-        for (let i = 0; i < finalCurvePoints.length; i++) {
-          dat += finalCurvePoints[i].x + ' ' + finalCurvePoints[i].y + ' ' + finalCurvePoints[i].z + '\n';
-        }
-        const a = document.createElement('a');
-        const blob = new Blob([dat], { type: 'plain/text' });
-        const url = window.URL.createObjectURL(blob);
-        a.href = url;
-        a.download = 'curve.txt';
-        a.click();
-        window.URL.revokeObjectURL(url);
-      }
+      Common.exportCurve(finalCurvePoints);
+    },
+    exportCurveObj() {
+      Common.exportCurveObj(finalCurvePoints);
     },
     curveColor: finalCurveColor,
     lineWidth: curveWidth,
   };
-  gui.add(commonObj, 'loadMesh').name('load mesh');
   gui.addColor(commonObj, 'curveColor').name('curve color').onChange((val) => {
     finalCurveColor = val;
     drawFinalCurve();
@@ -224,6 +188,7 @@ function setupGui() {
     drawFinalCurve();
   })
   gui.add(commonObj, 'exportCurve').name('export curve');
+  gui.add(commonObj, 'exportCurveObj').name('export curve as obj');
 
   // viewer params
   {
@@ -630,12 +595,6 @@ function closeScribble() {
   }
 }
 
-function resize() {
-  renderer.setSize(container.clientWidth, container.clientHeight);
-  camera.aspect = container.clientWidth / container.clientHeight;
-  camera.updateProjectionMatrix();
-}
-
 function updateScribbleCam() {
   scribbleCamera.left = scribbleX;
   scribbleCamera.right = scribbleX + scribbleWidth;
@@ -806,7 +765,7 @@ function main() {
   controls.dampingFactor = 0.05;
 
   // add lights
-  setupLights(scene, camera);
+  lights = Common.setupLights(scene, camera);
 
   // init raycaster
   raycaster = new THREE.Raycaster();
@@ -833,7 +792,7 @@ function main() {
   setupDomGuiEvents();
   setupGui();
   setupMouseFunctions();
-  window.addEventListener('resize', resize);
+  Common.setupResize(window, renderer, camera, container);
 
   // start render loop
   requestAnimationFrame(animate);
