@@ -4,8 +4,8 @@
   <title>ThreeJS App</title>
   <link rel='stylesheet' href='./css/style.css'>
   </style>
-  <script src='./src/math-expression-evaluator.min.js'></script>
-  <script type='module' src='./src/parametric.js'></script>
+  <script src='./src/kdTree-min.js'></script>
+  <script type='module' src='./src/wiremesh.js'></script>
 </head>
 
 <body oncontextmenu="return false;">
@@ -15,7 +15,10 @@
       <a href="projection.html">2D Curve Projection</a> &nbsp;
       <a href="wiremesh.html">Construct Wire Mesh</a>
     </p>
-    <p>Parametric Curve</p>
+    <p>2D Curve Projection</p>
+    <input type='file' id='loadmesh' style='visibility: hidden' accept='.obj' />
+    <input type='file' id='loadsvg' style='visibility: hidden' accept='.svg' />
+    <div id='svg-result' style='visibility: hidden; width: 0; height: 0;'></div>
   </div>
   <div id='canvas'></div>
 </body>

@@ -83,9 +83,9 @@ function setupDomGuiEvents() {
             // set model shading
             model.material = material;
             // center the mesh (based on bbox)
-            model.geometry.center();
+            // model.geometry.center();
             // scale mesh by about 3
-            model.scale.set(3, 3, 3);
+            // model.scale.set(3, 3, 3);
             scene.add(model);
           } catch (err) {
             alert('error in parsing file: ' + filename + ' - ' + err.message);
