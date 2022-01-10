@@ -12,13 +12,17 @@ let renderer, scene, camera, raycaster;
 let controls;
 let model;
 let lights;
-let mainPoints = [], ptIndicators = [], connectCurve = false;
+let mainPoints = [], ptIndicators = [];
+const closeParams = {
+  close: true,
+  closeAt: 0,
+  closeMax: 0,
+  closeGui: null,
+};
 let finalCurve, finalCurvePoints = [], finalCurveColor = new THREE.Color(1, 0, 0), curveWidth = 3;
 let finalPos;
-let tree;
 
 const smootherParams = {
-  epsilon: 10,
   alpha: 0.5,
   n_segs: 20,
 };
@@ -170,6 +174,12 @@ function setupGui() {
       undoLastPoint() {
         if (mainPoints.length > 0) {
           mainPoints = mainPoints.slice(0, -1);
+
+          closeParams.closeMax = mainPoints.length < 2 ? 0 : mainPoints.length - 2;
+          closeParams.closeAt = closeParams.closeAt > closeParams.closeMax ? 0 : closeParams.closeAt;
+          closeParams.closeGui.max(closeParams.closeMax);
+          closeParams.closeGui.updateDisplay();
+
           scene.remove(ptIndicators[ptIndicators.length - 1]);
           ptIndicators = ptIndicators.slice(0, -1);
           computePaths();
@@ -178,21 +188,23 @@ function setupGui() {
       resetCurve() {
         mainPoints.length = 0;
         finalCurvePoints.length = 0;
+
+        closeParams.closeMax = 0;
+        closeParams.closeAt = 0;
+        closeParams.closeGui.min(0).max(0);
+
         scene.remove(finalCurve);
         for (let ptMesh of ptIndicators) {
           scene.remove(ptMesh);
         }
       },
-      // connect: connectCurve,
     };
     curveProjFolder.add(curveProjObj, 'hideModel').name('show/hide model');
     curveProjFolder.add(curveProjObj, 'undoLastPoint').name('undo last point');
     curveProjFolder.add(curveProjObj, 'resetCurve').name('reset curve');
-    // curveProjFolder.add(curveProjObj, 'closeCurve').name('close curve');
+    curveProjFolder.add(closeParams, 'close').name('close curve').onChange(() => computePaths());
+    closeParams.closeGui = curveProjFolder.add(closeParams, 'closeAt', closeParams.closeMax, closeParams.closeMax, 1).name('close at').onChange(() => computePaths());
 
-    curveProjFolder.add(smootherParams, 'epsilon', 0, 50).onChange(() => {
-      computePaths();
-    });
     curveProjFolder.add(smootherParams, 'alpha', 0, 1).onChange(() => {
       computePaths();
     });
@@ -342,27 +354,58 @@ function addPoint() {
   ptMesh.position.copy(finalPos);
   ptIndicators.push(ptMesh);
   scene.add(ptMesh);
-  if (mainPoints.length > 1) {
-    computePaths();
-  }
+
+  closeParams.closeMax = mainPoints.length - 1;
+  closeParams.closeGui.max(closeParams.closeMax);
+  closeParams.closeGui.updateDisplay();
+
+  computePaths();
 }
 
 function computePaths() {
-  finalCurvePoints.length = 0;
-  const totalPts = mainPoints.length;
-  for (let i = 0; i < totalPts; i++) {
-    const i0 = (i - 1) < 0 ? totalPts - 1 : i - 1;
-    const i1 = i;
-    const i2 = (i + 1) % totalPts;
-    const i3 = (i + 2) % totalPts;
-
-    for (let j = 0; j < smootherParams.n_segs; j++) {
-      const t = j / smootherParams.n_segs;
-      const np = catmullRom(mainPoints[i0], mainPoints[i1], mainPoints[i2], mainPoints[i3], t);
-      finalCurvePoints.push(np);
+  if (mainPoints.length > 1) {
+    finalCurvePoints.length = 0;
+    const totalPts = mainPoints.length;
+    let iters = totalPts - 1;
+    if (closeParams.close) {
+      iters = totalPts;
+      if (closeParams.closeAt > 0) iters = closeParams.closeAt;
     }
+    for (let i = 0; i < iters; i++) {
+      const i0 = i < 1 ? totalPts - 1 : i - 1;
+      const i1 = i;
+      const i2 = (i + 1) % totalPts;
+      const i3 = (i + 2) % totalPts;
+
+      for (let j = 0; j < smootherParams.n_segs; j++) {
+        const t = j / smootherParams.n_segs;
+        const np = catmullRom(mainPoints[i0], mainPoints[i1], mainPoints[i2], mainPoints[i3], t);
+        finalCurvePoints.push(np);
+      }
+    }
+    if (closeParams.close && closeParams.closeAt > 0) {
+      const pts = mainPoints.slice(closeParams.closeAt);
+      const tpts = pts.length;
+      if (tpts > 1) {
+        for (let i = 0; i < tpts; i++) {
+          const i0 = i < 1 ? tpts - 1 : i - 1;
+          const i1 = i;
+          const i2 = (i + 1) % tpts;
+          const i3 = (i + 2) % tpts;
+
+          for (let j = 0; j < smootherParams.n_segs; j++) {
+            const t = j / smootherParams.n_segs;
+            const np = catmullRom(pts[i0], pts[i1], pts[i2], pts[i3], t);
+            finalCurvePoints.push(np);
+          }
+        }
+      }
+      else finalCurvePoints.push(pts[0]);
+    }
+    if (!closeParams.close) finalCurvePoints.push(mainPoints[totalPts - 1]);
+    else finalCurvePoints.push(mainPoints[closeParams.closeAt]);
+    drawFinalCurve();
   }
-  drawFinalCurve();
 }
 
 function drawFinalCurve() {
@@ -370,7 +413,6 @@ function drawFinalCurve() {
     scene.remove(finalCurve);
 
     // create the finalCurve mesh and add it to the scene
-    finalCurvePoints.push(finalCurvePoints[0]);
     const geom = new THREE.BufferGeometry().setFromPoints(finalCurvePoints)
     const line_tmp = new THREE.Line(geom, new THREE.LineBasicMaterial({ color: finalCurveColor }));
 
